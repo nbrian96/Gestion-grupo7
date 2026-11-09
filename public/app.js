@@ -23,7 +23,16 @@ const workTypeInline = (workType, holidayDescription='') => {
   return 'Habitual';
 };
 
-const adminWorkHistoryState = { page: 1, pageSize: 5, search: '', type: 'all' };
+const icons = {
+  checkCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  alertCircle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  x: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  download: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  calendar: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:middle"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
+};
+const viewDataCache = {};
+let assocHoursMode = 'single';
+const adminWorkHistoryState = { page: 1, pageSize: 10, search: '', type: 'all' };
 
 
 function parseCsvMatrix(text) {
@@ -94,6 +103,7 @@ function openMultipleWorkDialog(activeMembers) {
           <label class="multiple-file-label">Cargar desde archivo CSV
             <input id="multiple-work-csv" type="file" accept=".csv,text/csv">
           </label>
+          <button class="secondary" id="multiple-work-download-sample" type="button">${icons.download} Plantilla CSV</button>
           <button class="secondary" id="multiple-work-add" type="button">Agregar fila</button>
         </div>
         <div class="helper">Columnas del CSV: cuit, fecha, horas, descripcion. Máximo 200 registros por operación.</div>
@@ -122,6 +132,19 @@ function openMultipleWorkDialog(activeMembers) {
 
   addRow();
   dialog.showModal();
+  setupDialogFocusTrap(dialog);
+  $('multiple-work-download-sample').onclick = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const firstCuit = activeMembers[0]?.cuit || '20-30123456-9';
+    const sampleCsv = 'cuit,fecha,horas,descripcion\n' + firstCuit + ',' + today + ',8,Producción\n';
+    const blob = new Blob([sampleCsv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla_registro_horas.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  };
   $('multiple-work-close').onclick = closeDialog;
   $('multiple-work-cancel').onclick = closeDialog;
   $('multiple-work-add').onclick = () => addRow();
@@ -209,7 +232,7 @@ function showMemberDetails(m){
   const d=$('member-detail-dialog');
   $('close-member-detail').onclick=()=>d.close();
   $('download-member-monotributo')?.addEventListener('click',async()=>{try{await downloadMonotributo(m.id,m.monotributo_file)}catch(err){notify(err.message,'error')}});
-  d.addEventListener('close',()=>d.remove(),{once:true});d.showModal();
+  d.addEventListener('close',()=>d.remove(),{once:true});d.showModal();setupDialogFocusTrap(d);
 }
 
 
@@ -255,12 +278,58 @@ function historyVoteRows(snapshot){
   return people.map(p=>{const v=byId.get(String(p.member_id));return{fullName:p.full_name||v?.full_name||'—',roles:Array.isArray(p.roles)&&p.roles.length?p.roles:['Asociado'],vote:v?.vote||'Sin voto',createdAt:v?.created_at||null}});
 }
 
-function notify(message, type='ok') {
-  const box = $('status');
-  box.textContent = message;
-  box.className = 'status ' + (type === 'error' ? 'error' : 'ok');
-  clearTimeout(notify.t);
-  notify.t = setTimeout(() => { box.className='status'; box.textContent=''; }, 3500);
+function notify(message, type='ok', duration=4000) {
+  let container = $('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type === 'error' ? 'error' : 'ok'}`;
+  const icon = type === 'error' ? icons.alertCircle : icons.checkCircle;
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${esc(message)}</span>
+    <button class="toast-close" type="button" aria-label="Cerrar notificación">${icons.x}</button>
+  `;
+  container.appendChild(toast);
+  const removeToast = () => {
+    toast.classList.add('toast-leaving');
+    setTimeout(() => toast.remove(), 220);
+  };
+  toast.querySelector('.toast-close').onclick = removeToast;
+  const timeoutId = setTimeout(removeToast, duration);
+  toast.onmouseenter = () => clearTimeout(timeoutId);
+  toast.onmouseleave = () => setTimeout(removeToast, 1500);
+}
+
+function setupDialogFocusTrap(dialog) {
+  if (!dialog) return;
+  const getFocusables = () => dialog.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+  setTimeout(() => {
+    const focusables = getFocusables();
+    if (focusables.length) focusables[0].focus();
+  }, 40);
+
+  dialog.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      const focusables = getFocusables();
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        last.focus();
+        e.preventDefault();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        first.focus();
+        e.preventDefault();
+      }
+    }
+  });
 }
 
 async function api(path, options={}) {
@@ -329,7 +398,7 @@ function showForcedPasswordChange() {
         resolve(true);
       }catch(err){error.textContent=err.message;error.style.display='block'}
     });
-    dialog.showModal();
+    dialog.showModal();setupDialogFocusTrap(dialog);
   });
 }
 
@@ -419,6 +488,7 @@ document.addEventListener('change', event => {
 
 function go(view) {
   state.view = view;
+  viewDataCache[view] = null;
   sessionStorage.setItem('coopgestion_view', view);
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === view));
   document.querySelectorAll('#nav [data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -445,16 +515,34 @@ async function startApp() {
   const validViews = (state.user.role === 'admin' ? adminViews : assocViews).map(x=>x[0]);
   const first = validViews.includes(state.view) ? state.view : validViews[0];
   go(first);
+
+  const toggleBtn = $('mobile-menu-toggle');
+  const sidebar = $('sidebar');
+  const backdrop = $('sidebar-backdrop');
+  if (toggleBtn && sidebar && backdrop) {
+    const toggleMenu = (open) => {
+      const isOpen = open !== undefined ? open : !sidebar.classList.contains('mobile-open');
+      sidebar.classList.toggle('mobile-open', isOpen);
+      backdrop.classList.toggle('hidden', !isOpen);
+      toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    };
+    toggleBtn.onclick = () => toggleMenu();
+    backdrop.onclick = () => toggleMenu(false);
+    $('nav').querySelectorAll('[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (window.innerWidth <= 950) toggleMenu(false);
+      });
+    });
+  }
+
   clearInterval(state.poll);
   state.poll = setInterval(() => {
     const tag=document.activeElement?.tagName;
     if (['INPUT','TEXTAREA','SELECT'].includes(tag) || document.visibilityState!=='visible') return;
     if (document.querySelector('dialog[open], .panel.active form[data-dirty], .panel.active details[open], .panel.active .history-detail:not(.hidden)')) return;
-    // No refrescar la vista de Socios mientras el formulario de alta/reincorporación está abierto:
-    // un refresh durante la verificación asíncrona del PDF reemplazaba el formulario y borraba sus valores.
     if (state.view==='admin-socios' && memberUiState.formOpen) return;
     refreshCurrentView(true).catch(()=>{});
-  }, 3000);
+  }, 4000);
 }
 
 async function refreshCurrentView(silent=false) {
@@ -479,10 +567,13 @@ async function refreshCurrentView(silent=false) {
   if (renderers[state.view]) await renderers[state.view](silent);
 }
 
-async function renderAdminHome() {
+async function renderAdminHome(silent=false) {
   const [members, work, motions, retributions] = await Promise.all([
     api('/api/members'), api('/api/work-logs'), api('/api/motions'), api('/api/retributions')
   ]);
+  const fp = JSON.stringify([members.length, work.length, motions.length, retributions.length]);
+  if (silent && viewDataCache['admin-inicio'] === fp) return;
+  viewDataCache['admin-inicio'] = fp;
   const active = members.filter(m=>m.active && !m.verification_pending).length;
   const hours = work.reduce((s,x)=>s+Number(x.hours||0),0);
   const total = retributions.reduce((s,x)=>s+Number(x.total||0),0);
@@ -495,8 +586,11 @@ async function renderAdminHome() {
     <div class="card" style="margin-top:12px"><h3>Actividad compartida</h3><p class="muted">Consultá las horas registradas, las retribuciones y las decisiones de la cooperativa.</p><div class="notice">Mociones abiertas: <strong>${motions.length}</strong></div></div>`;
 }
 
-async function renderAdminMembers() {
+async function renderAdminMembers(silent=false) {
   const [members,authorities,monoAlerts]=await Promise.all([api('/api/members'),api('/api/authorities'),api('/api/admin/monotributos/alerts')]);
+  const fp = JSON.stringify([memberUiState.formOpen, memberUiState.search, memberUiState.filter, members.map(m=>[m.id,m.active,m.verification_pending,m.monotributo_status,m.roles]), authorities, monoAlerts.items.length]);
+  if (silent && viewDataCache['admin-socios'] === fp) return;
+  viewDataCache['admin-socios'] = fp;
   window.__adminMembers=members;
   const q=(memberUiState.search||'').toLowerCase();
   const filtered=members.filter(m=>{const statusOk=memberUiState.filter==='all'||(memberUiState.filter==='active'&&m.active&&!m.verification_pending)||(memberUiState.filter==='pending'&&m.verification_pending)||(memberUiState.filter==='inactive'&&!m.active&&!m.verification_pending);const hay=[m.full_name,m.dni,m.cuit,m.email,...(m.roles||[])].join(' ').toLowerCase();return statusOk&&(!q||hay.includes(q))});
@@ -546,7 +640,7 @@ async function renderAdminMembers() {
   document.querySelectorAll('[data-member-reactivate]').forEach(btn=>btn.onclick=()=>{const m=members.find(x=>String(x.id)===btn.dataset.memberReactivate);memberUiState.formOpen=true;memberUiState.reactivatingId=m.id;resetMono();renderAdminMembers().then(()=>{$('member-name').value=m.full_name;$('member-dni').value=m.dni;$('member-cuit').value=m.cuit;$('member-email').value=m.email||'';$('member-capital').value=m.capital_subscribed;$('member-initial').value=m.capital_integrated;['member-name','member-dni','member-cuit','member-email','member-capital','member-initial'].forEach(id=>$(id).disabled=true);$('member-login-section').classList.add('hidden');renderMemberValidation()})});
 }
 
-async function renderAdminWork() {
+async function renderAdminWork(silent=false) {
   const query = new URLSearchParams({
     paginated: '1',
     page: String(adminWorkHistoryState.page),
@@ -555,6 +649,9 @@ async function renderAdminWork() {
     type: adminWorkHistoryState.type
   });
   const [history,members] = await Promise.all([api('/api/work-logs?'+query.toString()),api('/api/members')]);
+  const fp = JSON.stringify([adminWorkHistoryState, history.total, history.page, history.items?.map(x=>[x.id,x.hours,x.work_date]), members.length]);
+  if (silent && viewDataCache['admin-trabajo'] === fp) return;
+  viewDataCache['admin-trabajo'] = fp;
   const logs = history.items || [];
   adminWorkHistoryState.page = history.page || 1;
   const activeMembers = members.filter(m=>m.active&&!m.verification_pending);
@@ -575,7 +672,12 @@ async function renderAdminWork() {
         <form id="work-history-filter" class="work-history-toolbar">
           <label class="work-history-search">Buscar asociado<input id="work-history-search" type="search" placeholder="Nombre del asociado" value="${esc(adminWorkHistoryState.search)}"></label>
           <label>Tipo<select id="work-history-type"><option value="all" ${adminWorkHistoryState.type==='all'?'selected':''}>Todos</option><option value="regular" ${adminWorkHistoryState.type==='regular'?'selected':''}>Habitual</option><option value="sunday" ${adminWorkHistoryState.type==='sunday'?'selected':''}>Domingo</option><option value="holiday" ${adminWorkHistoryState.type==='holiday'?'selected':''}>Feriado</option></select></label>
-          <div class="work-history-page-size-note"><span class="helper">5 registros por página</span></div>
+          <label>Por página<select id="work-history-pagesize">
+            <option value="5" ${adminWorkHistoryState.pageSize===5?'selected':''}>5</option>
+            <option value="10" ${adminWorkHistoryState.pageSize===10?'selected':''}>10</option>
+            <option value="25" ${adminWorkHistoryState.pageSize===25?'selected':''}>25</option>
+            <option value="50" ${adminWorkHistoryState.pageSize===50?'selected':''}>50</option>
+          </select></label>
           <div class="work-history-filter-actions"><button class="secondary" type="submit">Aplicar</button><button class="secondary" id="work-history-clear" type="button">Limpiar</button></div>
         </form>
         <div class="table-wrap work-history-table"><table><thead><tr><th>Socio</th><th>Fecha</th><th>Horas</th><th>Detalle</th><th>Tipo</th><th></th></tr></thead><tbody>
@@ -596,16 +698,20 @@ async function renderAdminWork() {
       notify('Horas registradas.'); adminWorkHistoryState.page=1; await renderAdminWork();
     } catch(err){notify(err.message,'error')}
   });
+  $('work-history-pagesize').onchange = async e => {
+    adminWorkHistoryState.pageSize = Number(e.target.value);
+    adminWorkHistoryState.page = 1;
+    await renderAdminWork();
+  };
   $('work-history-filter').addEventListener('submit',async e=>{
     e.preventDefault();
     adminWorkHistoryState.search=$('work-history-search').value.trim();
     adminWorkHistoryState.type=$('work-history-type').value;
-    adminWorkHistoryState.pageSize=5;
     adminWorkHistoryState.page=1;
     await renderAdminWork();
   });
   $('work-history-clear').onclick=async()=>{
-    Object.assign(adminWorkHistoryState,{page:1,pageSize:5,search:'',type:'all'});
+    Object.assign(adminWorkHistoryState,{page:1,search:'',type:'all'});
     await renderAdminWork();
   };
   $('work-history-prev').onclick=async()=>{if(adminWorkHistoryState.page>1){adminWorkHistoryState.page-=1;await renderAdminWork()}};
@@ -809,7 +915,7 @@ function openAssociatePasswordDialog() {
       notify('Contraseña actualizada correctamente.');
     }catch(err){notify(err.message,'error')}
   });
-  dialog.showModal();
+  dialog.showModal();setupDialogFocusTrap(dialog);
 }
 
 async function renderAssociateProfile() {
@@ -827,11 +933,136 @@ async function renderAssociateProfile() {
   $('assoc-open-password').addEventListener('click',openAssociatePasswordDialog);
 }
 
-async function renderAssociateHours() {
+function getAssociateWeekDates() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+  const res = [];
+  for (let i = 0; i < 5; i++) {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + i);
+    const iso = cur.toISOString().slice(0, 10);
+    res.push({
+      name: dayNames[i],
+      iso,
+      formatted: `${String(cur.getDate()).padStart(2, '0')}/${String(cur.getMonth() + 1).padStart(2, '0')}`
+    });
+  }
+  return res;
+}
+
+async function renderAssociateHours(silent=false) {
   const logs=await api('/api/work-logs');
-  $('assoc-horas').innerHTML=`<div class="split work-layout"><form id="assoc-hours-form" class="form-card"><h2>Registrar trabajo</h2><p class="muted">La carga queda vinculada automáticamente a tu usuario.</p><label>Fecha<input id="assoc-date" type="date" required></label><label>Horas<input id="assoc-hours" type="number" min="0.5" max="23.5" step="0.5" required></label><label>Descripción<textarea id="assoc-description" rows="3" maxlength="180"></textarea></label><div class="notice" style="margin-top:12px">No podés cargar horas para otro socio ni duplicar una fecha.</div><div class="actions"><button class="primary">Registrar horas</button></div></form><div><div class="section-head"><div><h2>Mis registros</h2><p class="muted">Estos mismos registros aparecen en Administración.</p></div></div><div class="list">${logs.length?logs.map(x=>`<article class="row-card"><div><strong>${displayDate(x.work_date)}</strong><div class="helper">${esc(x.description||'Sin detalle')} · ${esc(workTypeInline(x.work_type,x.holiday_description))}</div></div><strong>${Number(x.hours).toLocaleString('es-AR')} h</strong></article>`).join(''):'<div class="empty">Todavía no registraste horas.</div>'}</div></div></div>`;
-  $('assoc-date').value=new Date().toISOString().slice(0,10);
-  $('assoc-hours-form').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/work-logs',{method:'POST',body:JSON.stringify({workDate:$('assoc-date').value,hours:Number($('assoc-hours').value),description:$('assoc-description').value})});notify('Horas registradas. Administración ya puede ver la carga.');await renderAssociateHours()}catch(err){notify(err.message,'error')}});
+  const fp = JSON.stringify([assocHoursMode, logs.map(x=>[x.id, x.hours, x.work_date, x.description])]);
+  if (silent && viewDataCache['assoc-horas'] === fp) return;
+  viewDataCache['assoc-horas'] = fp;
+
+  const weekDays = getAssociateWeekDates();
+  const singleFormHtml = `
+    <form id="assoc-hours-form" class="form-card">
+      <h2>Registrar trabajo</h2>
+      <p class="muted">La carga queda vinculada automáticamente a tu usuario.</p>
+      <label>Fecha<input id="assoc-date" type="date" required></label>
+      <label>Horas<input id="assoc-hours" type="number" min="0.5" max="23.5" step="0.5" required></label>
+      <label>Descripción<textarea id="assoc-description" rows="3" maxlength="180"></textarea></label>
+      <div class="notice" style="margin-top:12px">No podés cargar horas para otro socio ni duplicar una fecha.</div>
+      <div class="actions"><button class="primary" type="submit">Registrar horas</button></div>
+    </form>`;
+
+  const weeklyFormHtml = `
+    <form id="assoc-weekly-form" class="form-card">
+      <h2>Carga semanal rápida</h2>
+      <p class="muted">Ingresá las horas trabajadas de lunes a viernes de la semana actual.</p>
+      <div class="weekly-grid">
+        ${weekDays.map(d => `
+          <div class="weekly-row">
+            <div class="weekly-day-title">${d.name}<span>${d.formatted} (${d.iso})</span></div>
+            <input type="number" min="0.5" max="23.5" step="0.5" placeholder="Horas" data-week-iso="${d.iso}">
+            <input type="text" maxlength="180" placeholder="Detalle (opcional)" data-week-desc="${d.iso}" value="Producción">
+          </div>
+        `).join('')}
+      </div>
+      <div class="actions">
+        <button class="primary" type="submit">Registrar horas de la semana</button>
+      </div>
+    </form>`;
+
+  $('assoc-horas').innerHTML = `
+    <div class="hours-mode-nav">
+      <button type="button" class="${assocHoursMode==='single'?'active':''}" id="assoc-mode-single">Carga individual</button>
+      <button type="button" class="${assocHoursMode==='weekly'?'active':''}" id="assoc-mode-weekly">${icons.calendar} Carga semanal rápida</button>
+    </div>
+    <div class="split work-layout">
+      ${assocHoursMode === 'single' ? singleFormHtml : weeklyFormHtml}
+      <div>
+        <div class="section-head"><div><h2>Mis registros</h2><p class="muted">Estos mismos registros aparecen en Administración.</p></div></div>
+        <div class="list">${logs.length?logs.map(x=>`<article class="row-card"><div><strong>${displayDate(x.work_date)}</strong><div class="helper">${esc(x.description||'Sin detalle')} · ${esc(workTypeInline(x.work_type,x.holiday_description))}</div></div><strong>${Number(x.hours).toLocaleString('es-AR')} h</strong></article>`).join(''):'<div class="empty">Todavía no registraste horas.</div>'}</div>
+      </div>
+    </div>`;
+
+  $('assoc-mode-single').onclick = () => { assocHoursMode = 'single'; renderAssociateHours(); };
+  $('assoc-mode-weekly').onclick = () => { assocHoursMode = 'weekly'; renderAssociateHours(); };
+
+  if (assocHoursMode === 'single') {
+    $('assoc-date').value = new Date().toISOString().slice(0,10);
+    $('assoc-hours-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        await api('/api/work-logs', {
+          method: 'POST',
+          body: JSON.stringify({
+            workDate: $('assoc-date').value,
+            hours: Number($('assoc-hours').value),
+            description: $('assoc-description').value
+          })
+        });
+        notify('Horas registradas. Administración ya puede ver la carga.');
+        await renderAssociateHours();
+      } catch (err) {
+        notify(err.message, 'error');
+      }
+    });
+  } else {
+    $('assoc-weekly-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const rows = $('assoc-weekly-form').querySelectorAll('[data-week-iso]');
+      const items = [];
+      rows.forEach(input => {
+        const hours = Number(input.value);
+        if (hours > 0 && hours < 24) {
+          const iso = input.dataset.weekIso;
+          const descInput = $('assoc-weekly-form').querySelector(`[data-week-desc="${iso}"]`);
+          items.push({
+            workDate: iso,
+            hours,
+            description: descInput?.value.trim() || 'Producción'
+          });
+        }
+      });
+      if (!items.length) {
+        notify('Ingresá las horas para al menos un día de la semana.', 'error');
+        return;
+      }
+      let success = 0;
+      let errors = [];
+      for (const item of items) {
+        try {
+          await api('/api/work-logs', { method: 'POST', body: JSON.stringify(item) });
+          success++;
+        } catch (err) {
+          errors.push(`${displayDate(item.workDate)}: ${err.message}`);
+        }
+      }
+      if (success > 0) {
+        notify(`Se registraron ${success} día${success===1?'':'s'} de trabajo correctamente.${errors.length ? ' Algunos días tenían carga previa.' : ''}`);
+        await renderAssociateHours();
+      } else {
+        notify(`No se pudieron guardar las horas: ${errors.join(', ')}`, 'error');
+      }
+    });
+  }
 }
 
 async function renderAssociateRetribution() {

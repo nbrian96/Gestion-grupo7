@@ -1,8 +1,5 @@
--- Datos ficticios para probar "Reporte de gestión" en CoopGestión.
--- Pensado para ejecutarse después de sql/schema.sql. Puede ejecutarse más de una vez:
--- los INSERT se protegen con NOT EXISTS / ON CONFLICT donde corresponde.
-
--- Feriado ficticio de prueba para mostrar la diferenciación de horas.
+-- Migración 004: Datos para Reporte de gestión
+-- Se ejecuta una sola vez al desplegar.
 INSERT INTO holidays(holiday_date,description)
 VALUES ('2026-11-06','Feriado de prueba para demo')
 ON CONFLICT (holiday_date) DO NOTHING;

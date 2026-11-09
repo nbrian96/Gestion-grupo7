@@ -16,6 +16,58 @@ async function waitAndConnect(maxRetries = 5, delayMs = 3000) {
   }
 }
 
+async function ensureMigrationTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+}
+
+async function runPendingMigrations(client) {
+  await ensureMigrationTable(client);
+
+  const migrationsDir = path.join(__dirname, '..', 'sql', 'migrations');
+  if (!fs.existsSync(migrationsDir)) return;
+
+  const files = fs.readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+
+  for (const file of files) {
+    const { rows } = await client.query(
+      'SELECT 1 FROM schema_migrations WHERE name = $1',
+      [file]
+    );
+
+    if (rows.length > 0) {
+      console.log(`[DB Migrations] Omitiendo migración ya ejecutada: ${file}`);
+      continue;
+    }
+
+    console.log(`[DB Migrations] Ejecutando migración: ${file}...`);
+    const filePath = path.join(migrationsDir, file);
+    const sql = fs.readFileSync(filePath, 'utf8');
+
+    await client.query('BEGIN');
+    try {
+      await client.query(sql);
+      await client.query(
+        'INSERT INTO schema_migrations (name) VALUES ($1)',
+        [file]
+      );
+      await client.query('COMMIT');
+      console.log(`[DB Migrations] Migración ${file} aplicada exitosamente.`);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error(`[DB Migrations] Error al ejecutar migración ${file}:`, err.message);
+      throw err;
+    }
+  }
+}
+
 async function initDatabase() {
   if (!process.env.DATABASE_URL) {
     console.warn('[DB Init] Advertencia: DATABASE_URL no está configurada. Omitiendo inicialización.');
@@ -44,10 +96,18 @@ async function initDatabase() {
       const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
       await client.query(schemaSql);
+      await ensureMigrationTable(client);
+      await client.query(
+        "INSERT INTO schema_migrations (name) VALUES ('001_schema.sql') ON CONFLICT DO NOTHING;"
+      );
       console.log('[DB Init] Esquema y datos semilla creados exitosamente en PostgreSQL.');
     } else {
-      console.log('[DB Init] Las tablas principales ya existen. No es necesario reinstalar el esquema base.');
+      console.log('[DB Init] Las tablas principales ya existen.');
     }
+
+    // Ejecutar migraciones pendientes automáticamente y una única vez
+    await runPendingMigrations(client);
+
   } catch (err) {
     console.error('[DB Init] Error durante la inicialización de la base de datos:', err);
     process.exit(1);

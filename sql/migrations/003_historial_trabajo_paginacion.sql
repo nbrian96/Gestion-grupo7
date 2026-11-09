@@ -1,6 +1,5 @@
--- Datos ficticios para probar la paginación y filtros del Historial de trabajo.
--- Es idempotente: si socio + fecha ya existe, no duplica el registro.
-
+-- Migración 003: Datos para paginación y filtros del Historial de trabajo
+-- Se ejecuta una sola vez al desplegar.
 INSERT INTO holidays(holiday_date, description)
 VALUES ('2026-07-09','Día de la Independencia · prueba')
 ON CONFLICT (holiday_date) DO UPDATE SET description=EXCLUDED.description;
@@ -49,8 +48,3 @@ SELECT m.id,t.work_date::date,t.hours::numeric,t.description
 FROM test_rows t
 JOIN members m ON m.full_name=t.full_name
 ON CONFLICT(member_id,work_date) DO NOTHING;
-
--- Control rápido
-SELECT COUNT(*) AS registros_prueba
-FROM work_logs
-WHERE description LIKE '%datos de prueba historial%';

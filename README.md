@@ -154,4 +154,4 @@ Las credenciales creadas por Administración usan una contraseña temporal. Los 
 
 ## Reporte de gestión
 
-La administración dispone de una vista consolidada por período con ingresos, gastos, saldo, horas, retribuciones estimadas, transferencias y fondos. El reporte puede exportarse a PDF. Para una demo con datos de noviembre de 2026 se incluye `samples/reporte_gestion_datos_prueba.sql`.
+La administración dispone de una vista consolidada por período con ingresos, gastos, saldo, horas, retribuciones estimadas, transferencias y fondos. El reporte puede exportarse a PDF. Los datos de prueba de noviembre de 2026 y de paginación de trabajo se aplican automáticamente al desplegar mediante las migraciones en `sql/migrations/`.

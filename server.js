@@ -802,7 +802,8 @@ app.get('/api/work-logs', auth, async (req, res) => {
 
   if (paginated) {
     const requestedPage = Math.max(1, Number.parseInt(req.query.page,10) || 1);
-    const pageSize = 5;
+    const parsedPageSize = Number.parseInt(req.query.pageSize, 10);
+    const pageSize = Number.isFinite(parsedPageSize) && parsedPageSize > 0 ? Math.min(100, Math.max(1, parsedPageSize)) : 10;
     const { rows: countRows } = await pool.query(`SELECT COUNT(*)::int AS total ${baseFrom}`, params);
     const total = Number(countRows[0]?.total || 0);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
