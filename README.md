@@ -55,7 +55,7 @@ docker compose up --build
 ## Ejecutarlo sin Docker
 
 1. Crear una base PostgreSQL llamada `coopgestion`.
-2. Ejecutar `sql/schema.sql` sobre esa base.
+2. Ejecutar `sql/schema.sql` sobre esa base (o correr `npm run db:init` con `DATABASE_URL` configurada).
 3. Copiar `.env.example` a `.env` y ajustar `DATABASE_URL`.
 4. Ejecutar:
 
@@ -86,20 +86,21 @@ Navegador Administrador ─┐
 Navegador Asociado ──────┘
 ```
 
-El frontend ya no conoce la contraseña de PostgreSQL. Solo habla con la API.
+El frontend en `public/` es servido directamente por el backend de Express. No hay problemas de CORS ni orígenes cruzados.
 
-## Deploy posterior
+## Despliegue en Railway
 
-Para acceder desde cualquier dispositivo por Internet hay que desplegar **la app/backend y PostgreSQL** en un servicio online. GitHub Pages por sí solo no ejecuta Node ni PostgreSQL.
+La aplicación está lista para desplegarse como servicio unificado (backend Express + frontend en `public/`) junto a una base PostgreSQL en Railway:
 
-En producción también hay que cambiar `JWT_SECRET`, usar HTTPS y configurar `FRONTEND_ORIGIN` con el dominio real.
-
-## Nota sobre la entrega anterior
-
-Esta versión backend migra los módulos que necesitan datos compartidos entre roles: login/usuarios, socios, horas, retribuciones, feriados, mociones, votos e historial. El esquema ya deja preparadas tablas para movimientos financieros y fondos; esas pantallas pueden conectarse a la API en una iteración siguiente.
-
-La versión restaurada conserva también Ingresos y gastos, Retiros y excedentes y Fondos en la vista Administrador.
-
+1. Crear un proyecto en [Railway](https://railway.com/) y provisionar **PostgreSQL**.
+2. Conectar el repositorio de GitHub como servicio web.
+3. Configurar variables de entorno en el servicio web:
+   - `DATABASE_URL`: `${{Postgres.DATABASE_URL}}`
+   - `NODE_ENV`: `production`
+   - `JWT_SECRET`: Clave secreta segura para firmar tokens JWT.
+   - `MONOTRIBUTO_ALERT_DAYS`: `5`
+4. Generar dominio público desde **Settings > Networking > Generate Domain**.
+5. Al iniciar por primera vez, `scripts/init-db.js` creará automáticamente las tablas y semillas en la base de datos de Railway.
 
 ## Constancia de monotributo: almacenamiento real
 
@@ -126,12 +127,6 @@ ORDER BY uploaded_at DESC;
 
 No conviene hacer `SELECT content` en la consola porque el `BYTEA` puede ser muy grande.
 
-La aplicación ejecuta una migración `CREATE TABLE IF NOT EXISTS member_documents` al
-arrancar, por lo que esta corrección funciona incluso si conservás el volumen de PostgreSQL
-anterior. Los socios demo creados antes de esta versión pueden tener solamente el nombre
-histórico del archivo; el PDF real aparecerá para nuevas altas/reincorporaciones.
-
-
 ## Control de vencimiento de constancias de monotributo
 
 La constancia actual queda almacenada en `member_documents` con fecha de emisión (si está disponible), fecha de vencimiento, estado de vigencia y resultado de la verificación. No se consulta ARCA ni se calcula una vigencia con reglas externas: la aplicación toma la fecha de vencimiento explícita del PDF y la compara con la fecha actual. Por defecto avisa 5 días antes; ese umbral se configura con `MONOTRIBUTO_ALERT_DAYS`.
@@ -142,14 +137,9 @@ La constancia actual queda almacenada en `member_documents` con fecha de emisió
 - Las constancias anteriores se conservan (`is_current=false`) y la última válida queda como actual.
 - La validación final se realiza del lado servidor con `pdf-parse`. PDF.js queda como verificación previa visual en el alta administrativa.
 
-Si ya existe un volumen PostgreSQL anterior, `server.js` agrega las nuevas columnas al iniciar. También se incluye `sql/migrations/002_monotributo_vigencia.sql`.
-
-
 ### Criterio de vigencia simplificado
 
 La vigencia se determina exclusivamente comparando `expires_at` con la fecha actual (`CURRENT_DATE` en PostgreSQL). No se realizan consultas oficiales a ARCA y no se infiere el vencimiento a partir de la fecha de emisión. Si el PDF no contiene una fecha de vencimiento reconocible, la carga queda como no verificable y se solicita una constancia donde esa fecha pueda leerse.
-
-> Compatibilidad: si una base existente contiene vencimientos calculados por una versión anterior (`validity_source` comenzando con `derived_`), al iniciar esta versión se descartan automáticamente esos vencimientos derivados y el documento pasa a `unknown` hasta que se cargue una constancia con vencimiento explícito.
 
 ## Corrección: PDFs que `pdf-parse` no puede leer
 
@@ -158,13 +148,6 @@ La API usa `pdf-parse` en servidor. Algunos PDFs pueden ser legibles por PDF.js 
 ## Historial de asambleas y exportación PDF
 
 Las mociones cerradas ya no muestran el `closed_snapshot` como JSON. El historial presenta el resultado, tipo, regla de mayoría, fecha de cierre, cómputo final y una tabla de votos por asociado con los roles congelados al cierre. Administración puede exportar un PDF detallado generado por el backend a partir del snapshot histórico.
-
-
-## GitHub Pages (frontend)
-
-La carpeta `docs/` está preparada para publicarse desde GitHub Pages (`entrega5-fix` → `/docs`).
-El login se mostrará correctamente porque los assets usan rutas relativas. Para conectar un backend desplegado, editar `docs/config.js` y definir `apiBaseUrl`. Ver `GITHUB_PAGES.md`.
-
 
 ### Contraseñas de asociados
 Las credenciales creadas por Administración usan una contraseña temporal. Los asociados deben cambiarla en su primer ingreso y luego pueden actualizarla desde **Mi perfil > Seguridad**.
