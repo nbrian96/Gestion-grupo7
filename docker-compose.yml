@@ -26,6 +26,8 @@ services:
       MONOTRIBUTO_ALERT_DAYS: 5
     ports:
       - "3000:3000"
+    volumes:
+      - ./public:/app/public:ro
     depends_on:
       db:
         condition: service_healthy

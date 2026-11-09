@@ -1,83 +1,138 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CoopGestión — Sistema de Gestión Cooperativa</title>
+  <!-- Bootstrap 5.3 & Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <section id="login-screen" class="login-screen">
-    <div class="login-card">
-      <div class="brand">
-        <div class="brand-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+<body class="bg-body-tertiary">
+  <!-- Pantalla de Login -->
+  <section id="login-screen" class="login-screen min-vh-100 d-flex align-items-center justify-content-center p-3">
+    <div class="login-card card border-0 shadow-lg p-4 p-md-5" style="max-width: 440px; width: 100%;">
+      <div class="brand d-flex align-items-center gap-3 mb-4">
+        <div class="brand-icon bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;" aria-hidden="true">
+          <i class="bi bi-intersect fs-3"></i>
         </div>
-        <div><h1>CoopGestión</h1><div class="muted">Acceso al sistema</div></div>
+        <div>
+          <h1 class="h3 fw-bold mb-0 text-dark">CoopGestión</h1>
+          <div class="text-secondary small">Acceso al sistema cooperativo</div>
+        </div>
       </div>
       <form id="login-form" class="login-form">
-        <label>Usuario<input id="login-user" autocomplete="username" placeholder="Usuario" required></label>
-        <label>Contraseña<input id="login-password" type="password" autocomplete="current-password" required></label>
-        <button class="primary" type="submit">Iniciar sesión</button>
+        <div class="mb-3">
+          <label for="login-user" class="form-label fw-semibold text-dark">Usuario</label>
+          <div class="input-group">
+            <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-person"></i></span>
+            <input id="login-user" class="form-control form-control-lg border-start-0 ps-0" autocomplete="username" placeholder="Nombre de usuario" required>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label for="login-password" class="form-label fw-semibold text-dark">Contraseña</label>
+          <div class="input-group">
+            <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-lock"></i></span>
+            <input id="login-password" type="password" class="form-control form-control-lg border-start-0 ps-0" autocomplete="current-password" placeholder="••••••••" required>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2" type="submit">
+          <i class="bi bi-box-arrow-in-right"></i> Iniciar sesión
+        </button>
       </form>
-      <div id="login-error" class="login-error" role="alert"></div>
+      <div id="login-error" class="alert alert-danger d-flex align-items-center gap-2 mt-3 mb-0 d-none" role="alert">
+        <i class="bi bi-exclamation-circle-fill flex-shrink-0"></i>
+        <div id="login-error-text" class="small"></div>
+      </div>
     </div>
   </section>
 
-  <main id="app" class="app hidden">
-    <div id="sidebar-backdrop" class="sidebar-backdrop hidden" tabindex="-1"></div>
-    <div class="layout">
-      <aside id="sidebar" class="sidebar">
-        <div class="brand">
-          <div class="brand-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+  <!-- Aplicación Principal -->
+  <main id="app" class="app min-vh-100 d-none">
+    <div class="layout-wrapper d-flex">
+      <!-- Sidebar Desktop -->
+      <aside id="sidebar" class="sidebar bg-white border-end d-none d-lg-flex flex-column p-3" style="width: 270px; min-height: 100vh;">
+        <div class="brand d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+          <div class="brand-icon bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;" aria-hidden="true">
+            <i class="bi bi-intersect fs-4"></i>
           </div>
-          <div><strong>CoopGestión</strong><div id="sidebar-subtitle" class="helper"></div></div>
+          <div class="overflow-hidden">
+            <strong class="d-block text-truncate text-dark">CoopGestión</strong>
+            <small id="sidebar-subtitle" class="text-secondary d-block text-truncate"></small>
+          </div>
         </div>
-        <nav id="nav" class="nav" aria-label="Navegación principal"></nav>
+        <nav id="nav" class="nav nav-pills flex-column gap-1 flex-grow-1" aria-label="Navegación principal"></nav>
       </aside>
-      <section class="content">
-        <div class="topbar">
-          <div class="topbar-left">
-            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-label="Abrir navegación" aria-expanded="false" type="button">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+
+      <!-- Offcanvas Mobile Navigation -->
+      <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+        <div class="offcanvas-header border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <div class="brand-icon bg-primary-subtle text-primary rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;" aria-hidden="true">
+              <i class="bi bi-intersect fs-4"></i>
+            </div>
+            <strong class="text-dark" id="sidebarOffcanvasLabel">CoopGestión</strong>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+        <div class="offcanvas-body p-3">
+          <nav id="nav-mobile" class="nav nav-pills flex-column gap-1" aria-label="Navegación móvil"></nav>
+        </div>
+      </div>
+
+      <!-- Contenedor de Contenido -->
+      <div class="content-wrapper flex-grow-1 min-vw-0 d-flex flex-column bg-body-tertiary">
+        <!-- Topbar Superior -->
+        <header class="topbar bg-white border-bottom px-3 px-md-4 py-3 d-flex align-items-center justify-content-between gap-3 shadow-sm sticky-top">
+          <div class="d-flex align-items-center gap-3 min-vw-0">
+            <button class="btn btn-outline-secondary d-lg-none d-flex align-items-center justify-content-center p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Abrir menú">
+              <i class="bi bi-list fs-4"></i>
             </button>
-            <div>
-              <div id="eyebrow" class="eyebrow">Cooperativa de Trabajo</div>
-              <h1 id="page-title"></h1>
+            <div class="min-vw-0">
+              <span id="eyebrow" class="text-uppercase text-secondary fw-bold" style="font-size: 11px; letter-spacing: 0.08em;">Cooperativa de Trabajo</span>
+              <h1 id="page-title" class="h4 fw-bold mb-0 text-dark text-truncate"></h1>
             </div>
           </div>
-          <div class="user">
-            <div id="user-avatar" class="avatar">A</div>
-            <div><strong id="user-name"></strong><small id="user-role" class="muted"></small></div>
+          <div class="user d-flex align-items-center gap-2 border rounded-pill py-1 px-3 bg-light shadow-sm">
+            <div id="user-avatar" class="avatar rounded-circle bg-primary text-white fw-bold d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; font-size: 13px;">A</div>
+            <div class="d-none d-sm-block text-start">
+              <strong id="user-name" class="d-block text-dark small fw-bold lh-sm"></strong>
+              <small id="user-role" class="text-secondary d-block" style="font-size: 11px;"></small>
+            </div>
           </div>
-        </div>
-        <div id="status" class="status hidden" role="status"></div>
+        </header>
 
-        <section id="admin-inicio" class="panel"></section>
-        <section id="admin-socios" class="panel"></section>
-        <section id="admin-trabajo" class="panel"></section>
-        <section id="admin-retribuciones" class="panel"></section>
-        <section id="admin-finanzas" class="panel"></section>
-        <section id="admin-retiros" class="panel"></section>
-        <section id="admin-fondos" class="panel"></section>
-        <section id="admin-reporte" class="panel"></section>
-        <section id="admin-asamblea" class="panel"></section>
-        <section id="admin-historial" class="panel"></section>
+        <!-- Área Principal de Vistas -->
+        <main class="content-body p-3 p-md-4 flex-grow-1">
+          <section id="admin-inicio" class="panel"></section>
+          <section id="admin-socios" class="panel"></section>
+          <section id="admin-trabajo" class="panel"></section>
+          <section id="admin-retribuciones" class="panel"></section>
+          <section id="admin-finanzas" class="panel"></section>
+          <section id="admin-retiros" class="panel"></section>
+          <section id="admin-fondos" class="panel"></section>
+          <section id="admin-reporte" class="panel"></section>
+          <section id="admin-asamblea" class="panel"></section>
+          <section id="admin-historial" class="panel"></section>
 
-        <section id="assoc-inicio" class="panel"></section>
-        <section id="assoc-perfil" class="panel"></section>
-        <section id="assoc-horas" class="panel"></section>
-        <section id="assoc-retribucion" class="panel"></section>
-        <section id="assoc-asamblea" class="panel"></section>
-      </section>
+          <section id="assoc-inicio" class="panel"></section>
+          <section id="assoc-perfil" class="panel"></section>
+          <section id="assoc-horas" class="panel"></section>
+          <section id="assoc-retribucion" class="panel"></section>
+          <section id="assoc-asamblea" class="panel"></section>
+        </main>
+      </div>
     </div>
   </main>
 
-  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+  <!-- Contenedor Toasts Flotantes -->
+  <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1090;" aria-live="polite" aria-atomic="true"></div>
 
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
-  <script src="/app.js"></script>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>
