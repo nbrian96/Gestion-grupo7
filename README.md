@@ -151,3 +151,7 @@ Las mociones cerradas ya no muestran el `closed_snapshot` como JSON. El historia
 
 ### Contraseñas de asociados
 Las credenciales creadas por Administración usan una contraseña temporal. Los asociados deben cambiarla en su primer ingreso y luego pueden actualizarla desde **Mi perfil > Seguridad**.
+
+## Reporte de gestión
+
+La administración dispone de una vista consolidada por período con ingresos, gastos, saldo, horas, retribuciones estimadas, transferencias y fondos. El reporte puede exportarse a PDF. Para una demo con datos de noviembre de 2026 se incluye `samples/reporte_gestion_datos_prueba.sql`.
